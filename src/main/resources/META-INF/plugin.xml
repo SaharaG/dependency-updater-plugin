@@ -1,19 +1,55 @@
+<!-- https://jetbrains.org/intellij/sdk/docs/basics/plugin_structure/plugin_configuration_file.html -->
 <idea-plugin>
-    <id>com.github.liaow.mavenversionsupdaterpluginnew</id>
-    <name>maven-versions-updater-plugin-new</name>
-    <vendor>liaow</vendor>
+    <id>dependency-updater-plugin</id>
+    <name>Dependency Updater</name>
+    <vendor email="cs.liaow@gmail.com" url="https://github.com/saharag/maven-versions-updater-plugin-new">SaharaTeam
+    </vendor>
+
+    <description><![CDATA[
+    <h1>IntelliJ Dependency Updater plugin</h1>
+    <br/>
+    <a href="https://github.com/SaharaG/dependency-updater-plugin">GitHub</a> |
+    <a href="https://github.com/SaharaG/dependency-updater-plugin/issues">Issues</a>
+    <br/>
+
+    <b>A plugin that check versions support for dependencies</b>
+    <br/>
+
+    <b>Features</b>
+    <ul>
+        <li>auto check latest versions of dependencies</li>
+        <li>auto check latest versions of dependency-management</li>
+        <li>latest versions of dependencies or dependency-management check can be triggered manually</li>
+    </ul>
+    <br/>
+    ]]></description>
 
     <!-- Product and plugin compatibility requirements -->
     <!-- https://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.idea.maven</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <applicationService serviceImplementation="com.github.liaow.mavenversionsupdaterpluginnew.services.MyApplicationService"/>
-        <projectService serviceImplementation="com.github.liaow.mavenversionsupdaterpluginnew.services.MyProjectService"/>
+        <localInspection language="XML" shortName="MavenDependencyUpdaterInspection"
+                         key="inspection.plugin.maven.key"
+                         groupKey="inspection.group.name"
+                         bundle="messages.DependencyUpdaterBundle"
+                         enabledByDefault="true"
+                         hasStaticDescription="true"
+                         level="WARNING"
+                         implementationClass="com.sahara.plugin.jetbrains.maven.inspection.DependencyUpdaterInspection"/>
     </extensions>
 
     <projectListeners>
-        <listener class="com.github.liaow.mavenversionsupdaterpluginnew.listeners.MyProjectManagerListener"
-                  topic="com.intellij.openapi.project.ProjectManagerListener"/>
     </projectListeners>
+    <actions>
+        <!-- https://jetbrainss.org/intellij/sdk/docs/tutorials/action_system/working_with_custom_actions.html -->
+        <action id="DependencyUpdaterInspectionAction"
+                class="com.sahara.plugin.jetbrains.action.DependencyUpdaterInspectionAction"
+                text="Dependency Updater: Check Latest Dependency"
+                description="Check latest maven or gradle dependencies version">
+            <override-text place="MainMenu" text="Check Latest Dependency"/>
+            <add-to-group group-id="Maven.GlobalProjectMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>

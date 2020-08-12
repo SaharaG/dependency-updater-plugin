@@ -39,6 +39,7 @@ repositories {
 }
 dependencies {
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.10.0")
+    testImplementation("junit:junit:4.13")
 }
 
 // Configure gradle-intellij-plugin plugin.
@@ -54,6 +55,7 @@ intellij {
 //  https://www.jetbrains.org/intellij/sdk/docs/basics/plugin_structure/plugin_dependencies.html
 //
 //  setPlugins("java")
+    setPlugins("org.jetbrains.idea.maven")
 }
 
 // Configure detekt plugin.

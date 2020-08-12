@@ -1,37 +1,34 @@
-# maven-versions-updater-plugin-new
+# dependency-updater-plugin
 
-![Build](https://github.com/SaharaG/maven-versions-updater-plugin-new/workflows/Build/badge.svg)
-[![Version](https://img.shields.io/jetbrains/plugin/v/PLUGIN_ID.svg)](https://plugins.jetbrains.com/plugin/PLUGIN_ID)
-[![Downloads](https://img.shields.io/jetbrains/plugin/d/PLUGIN_ID.svg)](https://plugins.jetbrains.com/plugin/PLUGIN_ID)
+![Build](https://github.com/SaharaG/dependency-updater-plugin/workflows/Build/badge.svg)
+[![Version](https://img.shields.io/jetbrains/plugin/v/14270-maven-updater.svg)](https://plugins.jetbrains.com/plugin/14270-maven-updater)
+[![Downloads](https://img.shields.io/jetbrains/plugin/d/14270-maven-updater.svg)](https://plugins.jetbrains.com/plugin/14270-maven-updater)
 
-## Template ToDo list
-- [x] Create a new [IntelliJ Platform Plugin Template][template] project.
-- [ ] Verify the [pluginGroup](/gradle.properties), [plugin ID](/src/main/resources/META-INF/plugin.xml) and [sources package](/src/main/kotlin).
-- [ ] Review the [Legal Agreements](https://plugins.jetbrains.com/docs/marketplace/legal-agreements.html).
-- [ ] [Publish a plugin manually](https://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/publishing_plugin.html) for the first time.
-- [ ] Set the Plugin ID in the above README badges.
-- [ ] Set the [Deployment Token](https://plugins.jetbrains.com/docs/marketplace/plugin-upload.html).
-- [ ] Click the <kbd>Watch</kbd> button on the top of the [IntelliJ Platform Plugin Template][template] to be notified about releases containing new features and fixes.
-
+## Plugin for [IntelliJ IDEA](http://plugins.jetbrains.com/plugin/14270-maven-updater)
 <!-- Plugin description -->
-This Fancy IntelliJ Platform Plugin is going to be your implementation of the brilliant ideas that you have.
+A plugin that check versions support for maven dependencies with IntelliJ IDEA.
 
-This specific section is a source for the [plugin.xml](/src/main/resources/META-INF/plugin.xml) file which will be
-extracted by the [Gradle](/build.gradle.kts) during the build process.
-
-To keep everything working, do not remove `<!-- ... -->` sections. 
+Features / Supports
+--------
+- auto check latest versions of dependencies
+- auto check latest versions of dependency-management
 <!-- Plugin description end -->
+
+Demo
+-------
+![Plugin Inspection.gif](https://i.loli.net/2020/08/12/heLCYMUPKmW4l5H.gif)
+![Plugin Action.gif](https://i.loli.net/2020/08/12/34zMFRL786opK2T.gif)
 
 ## Installation
 
 - Using IDE built-in plugin system:
   
-  <kbd>Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>Marketplace</kbd> > <kbd>Search for "maven-versions-updater-plugin-new"</kbd> >
+  <kbd>Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>Marketplace</kbd> > <kbd>Search for "Dependency Updater"</kbd> >
   <kbd>Install Plugin</kbd>
   
 - Manually:
 
-  Download the [latest release](https://github.com/SaharaG/maven-versions-updater-plugin-new/releases/latest) and install it manually using
+  Download the [latest release](https://github.com/SaharaG/dependency-updater-plugin/releases/latest) and install it manually using
   <kbd>Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk...</kbd>
 
 

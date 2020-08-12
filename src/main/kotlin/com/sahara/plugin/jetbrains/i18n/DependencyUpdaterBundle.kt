@@ -1,13 +1,16 @@
-package com.github.liaow.mavenversionsupdaterpluginnew
+package com.sahara.plugin.jetbrains.i18n
 
 import com.intellij.AbstractBundle
 import org.jetbrains.annotations.NonNls
 import org.jetbrains.annotations.PropertyKey
 
+/**
+ * @author liao
+ * Create on 2020/8/11 23:37
+ */
 @NonNls
-private const val BUNDLE = "messages.MyBundle"
-
-object MyBundle : AbstractBundle(BUNDLE) {
+private const val BUNDLE = "messages.DependencyUpdaterBundle"
+object DependencyUpdaterBundle : AbstractBundle(BUNDLE) {
 
     @Suppress("SpreadOperator")
     @JvmStatic
