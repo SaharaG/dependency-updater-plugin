@@ -12,6 +12,7 @@ Features / Supports
 --------
 - auto check latest versions of dependencies
 - auto check latest versions of dependency-management
+- versions of dependencies or dependency-management check can be triggered manually
 <!-- Plugin description end -->
 
 Demo

@@ -5,25 +5,6 @@
     <vendor email="cs.liaow@gmail.com" url="https://github.com/SaharaG">SaharaTeam
     </vendor>
 
-    <description><![CDATA[
-    <h1>IntelliJ Dependency Updater plugin</h1>
-    <br/>
-    <a href="https://github.com/SaharaG/dependency-updater-plugin">GitHub</a> |
-    <a href="https://github.com/SaharaG/dependency-updater-plugin/issues">Issues</a>
-    <br/>
-
-    <b>A plugin that check versions support for dependencies</b>
-    <br/>
-
-    <b>Features</b>
-    <ul>
-        <li>auto check latest versions of dependencies</li>
-        <li>auto check latest versions of dependency-management</li>
-        <li>latest versions of dependencies or dependency-management check can be triggered manually</li>
-    </ul>
-    <br/>
-    ]]></description>
-
     <!-- Product and plugin compatibility requirements -->
     <!-- https://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
