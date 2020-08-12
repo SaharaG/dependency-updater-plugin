@@ -1,10 +1,10 @@
 # dependency-updater-plugin
 
 ![Build](https://github.com/SaharaG/dependency-updater-plugin/workflows/Build/badge.svg)
-[![Version](https://img.shields.io/jetbrains/plugin/v/14270-maven-updater.svg)](https://plugins.jetbrains.com/plugin/14270-maven-updater)
-[![Downloads](https://img.shields.io/jetbrains/plugin/d/14270-maven-updater.svg)](https://plugins.jetbrains.com/plugin/14270-maven-updater)
+[![Version](https://img.shields.io/jetbrains/plugin/v/14859-dependency-updater.svg)](https://plugins.jetbrains.com/plugin/14859-dependency-updater)
+[![Downloads](https://img.shields.io/jetbrains/plugin/d/14859-dependency-updater.svg)](https://plugins.jetbrains.com/plugin/14859-dependency-updater)
 
-## Plugin for [IntelliJ IDEA](http://plugins.jetbrains.com/plugin/14270-maven-updater)
+## Plugin for [IntelliJ IDEA](http://plugins.jetbrains.com/plugin/14859-dependency-updater)
 <!-- Plugin description -->
 A plugin that check versions support for maven dependencies with IntelliJ IDEA.
 

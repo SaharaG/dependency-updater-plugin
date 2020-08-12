@@ -3,4 +3,15 @@
 
 formatting:
   Indentation:
-    active: true
+    active: false
+  ParameterListWrapping:
+    active: false
+
+complexity:
+  LongParameterList:
+    active: false
+
+style:
+  ReturnCount:
+    active: false
+

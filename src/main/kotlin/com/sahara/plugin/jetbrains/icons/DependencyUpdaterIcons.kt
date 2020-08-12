@@ -12,6 +12,5 @@ object DependencyUpdaterIcons {
         return IconManager.getInstance().getIcon(path, DependencyUpdaterIcons::class.java)
     }
 
-
     val DependencyUpdaterLogo = load("/icons/updater.svg")
 }

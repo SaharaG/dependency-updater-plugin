@@ -29,6 +29,7 @@ import org.jetbrains.idea.maven.onlinecompletion.model.MavenDependencyCompletion
 import org.jetbrains.idea.maven.server.MavenServerManager
 import java.util.*
 import java.util.function.Consumer
+import kotlin.collections.HashSet
 
 /**
  * maven dependency version checker
@@ -43,18 +44,17 @@ import java.util.function.Consumer
  */
 class DependencyUpdaterInspection : DomElementsInspection<MavenDomProjectModel?>(MavenDomProjectModel::class.java) {
 
-    override fun checkFileElement(domFileElement: DomFileElement<MavenDomProjectModel?>?, holder: DomElementAnnotationHolder?) {
+    override fun checkFileElement(
+            domFileElement: DomFileElement<MavenDomProjectModel?>?,
+            holder: DomElementAnnotationHolder?
+    ) {
         val projectModel = domFileElement?.rootElement ?: return
-        val module = domFileElement.module ?: return
         if (null == holder) {
             return
         }
-        // fixme
-        val mavenArtifactSearcher = MavenArtifactSearcher()
-        // 将所有依赖加入map
-        /// MultiMap<Pair<String, String>, MavenDomDependency> dependencies = MultiMap.createSet();
-        /// dependencies.putValue(Pair.create(groupId, artifactId), dependency);
+
         val dependencies: MutableSet<MavenDomDependency> = HashSet()
+
         // dependencies in <dependencies></dependencies>
         for (dependency in projectModel.dependencies.dependencies) {
             val groupId = dependency.groupId.stringValue
@@ -64,6 +64,7 @@ class DependencyUpdaterInspection : DomElementsInspection<MavenDomProjectModel?>
             }
             dependencies.add(dependency)
         }
+
         // dependencies in <dependencyManagement><dependencies></dependencies></dependencyManagement>
         for (dependency in projectModel.dependencyManagement.dependencies.dependencies) {
             val groupId = dependency.groupId.stringValue
@@ -73,38 +74,10 @@ class DependencyUpdaterInspection : DomElementsInspection<MavenDomProjectModel?>
             }
             dependencies.add(dependency)
         }
+
         // todo plugin dependencies in build
         // todo parent dependency like spring boot
-        dependencies.forEach(Consumer { dependency: MavenDomDependency ->
-            val groupId = dependency.groupId.stringValue
-            val artifactId = dependency.artifactId.stringValue
-            val version = dependency.version.stringValue
-            if (null == version || StringUtil.isEmptyOrSpaces(version)) {
-                return@Consumer
-            }
-            // remote https://package-search.services.jetbrains.com/api/search/idea/fulltext?query=${pattern}
-            val pattern = "$groupId:$artifactId:"
-            val results = mavenArtifactSearcher.search(module.project, pattern, 200)
-            for (result in results) {
-                val info = result.searchResults
-                if (groupId != info.groupId || artifactId != info.artifactId) {
-                    continue
-                }
-                val versions: Array<MavenDependencyCompletionItem> = info.items
-                Arrays.sort(versions) { i1: MavenCoordinate, i2: MavenCoordinate ->
-                    val v1 = i1.version
-                    val v2 = i2.version
-                    assert(v1 != null)
-                    ComparableVersion(v2).compareTo(ComparableVersion(v1))
-                }
-                // latest version item
-                val latestVersion = versions[0].version
-                if (null != latestVersion && !StringUtil.isEmptyOrSpaces(latestVersion) && ComparableVersion(latestVersion) > ComparableVersion(version)) {
-                    logger.info("[$groupId:$artifactId] found latest version : $latestVersion")
-                    createProblem(dependency, holder, projectModel, groupId, artifactId, version, latestVersion)
-                }
-            }
-        })
+        checkLatestVersion(domFileElement, holder, dependencies)
     }
 
     override fun getGroupDisplayName(): String {
@@ -132,6 +105,47 @@ class DependencyUpdaterInspection : DomElementsInspection<MavenDomProjectModel?>
         private const val DEFINED_AS_PROPERTY_START = "\${"
         private const val MAVEN_VERSION_35 = "3.5"
         private const val VALUE_TO_CHECK = "\\$\\{(revision|sha1|changelist)}"
+        private const val MAX_ARTIFACT_SEARCHER_RESULT = 200
+        private val mavenArtifactSearcher = MavenArtifactSearcher()
+
+        private fun checkLatestVersion(domFileElement: DomFileElement<MavenDomProjectModel?>,
+                                       holder: DomElementAnnotationHolder,
+                                       dependencies: MutableSet<MavenDomDependency>) {
+            val module = domFileElement.module ?: return
+            dependencies.forEach(Consumer { dependency: MavenDomDependency ->
+                val groupId = dependency.groupId.stringValue
+                val artifactId = dependency.artifactId.stringValue
+                val version = dependency.version.stringValue
+                if (null == version || StringUtil.isEmptyOrSpaces(version)) {
+                    return@Consumer
+                }
+
+                // remote https://package-search.services.jetbrains.com/api/search/idea/fulltext?query=${pattern}
+                val pattern = "$groupId:$artifactId:"
+                val results = mavenArtifactSearcher.search(module.project, pattern, MAX_ARTIFACT_SEARCHER_RESULT)
+                for (result in results) {
+                    val info = result.searchResults
+                    if (groupId != info.groupId || artifactId != info.artifactId) {
+                        continue
+                    }
+                    val versions: Array<MavenDependencyCompletionItem> = info.items
+                    Arrays.sort(versions) { i1: MavenCoordinate, i2: MavenCoordinate ->
+                        val v1 = i1.version
+                        val v2 = i2.version
+                        assert(v1 != null)
+                        ComparableVersion(v2).compareTo(ComparableVersion(v1))
+                    }
+
+                    // latest version item
+                    val latestVersion = versions[0].version
+                    if (null != latestVersion && !StringUtil.isEmptyOrSpaces(latestVersion) && ComparableVersion
+                            (latestVersion) > ComparableVersion(version)) {
+                        logger.info("[$groupId:$artifactId] found latest version : $latestVersion")
+                        createProblem(dependency, domFileElement, holder, groupId, artifactId, version, latestVersion)
+                    }
+                }
+            })
+        }
 
         /**
          * create problem after versions check
@@ -145,20 +159,30 @@ class DependencyUpdaterInspection : DomElementsInspection<MavenDomProjectModel?>
          * @param latestVersion latest version
          */
         private fun createProblem(dependency: MavenDomDependency,
+                                  domFileElement: DomFileElement<MavenDomProjectModel?>,
                                   holder: DomElementAnnotationHolder,
-                                  model: MavenDomProjectModel,
                                   groupId: String,
                                   artifactId: String,
                                   version: String,
                                   latestVersion: String) {
+            val projectModel = domFileElement.rootElement
             val domValue = dependency.version
+
             // ${xx.version}
             val unresolvedValue = domValue.rawText ?: return
-            val maven35 = StringUtil.compareVersionNumbers(MavenServerManager.getInstance().currentMavenVersion, MAVEN_VERSION_35) >= 0
-            val valueToCheck = if (maven35) unresolvedValue.replace(VALUE_TO_CHECK.toRegex(), "") else unresolvedValue
+            val maven35 = StringUtil.compareVersionNumbers(
+                    MavenServerManager.getInstance().currentMavenVersion,
+                    MAVEN_VERSION_35
+            ) >= 0
+            val valueToCheck = if (maven35) {
+                unresolvedValue.replace(VALUE_TO_CHECK.toRegex(), "")
+            } else {
+                unresolvedValue
+            }
             logger.info("[$groupId:$artifactId] value to check : $valueToCheck")
             var fix: LocalQuickFix? = null
             if (valueToCheck.contains(DEFINED_AS_PROPERTY_START)) {
+
                 // resolved value defined in property, 1.2.3
                 var resolvedValue: @Nullable String? = domValue.stringValue ?: return
                 val xmlElement = domValue.xmlElement ?: return
@@ -168,9 +192,10 @@ class DependencyUpdaterInspection : DomElementsInspection<MavenDomProjectModel?>
                 if (unresolvedValue == resolvedValue || resolvedValue.contains(DEFINED_AS_PROPERTY_START)) {
                     resolvedValue = resolveXmlElement(xmlElement)
                 }
+
                 // find reference property
-                val psiReference = ContainerUtil.findInstance(domValue.xmlElement!!.references, MavenPropertyPsiReference::class.java)
-                        ?: return
+                val psiReference = ContainerUtil.findInstance(domValue.xmlElement!!.references,
+                        MavenPropertyPsiReference::class.java) ?: return
                 val resolvedElement = psiReference.resolve() ?: return
                 val psiElement = (resolvedElement as MavenPsiElementWrapper).wrappee
                 if (unresolvedValue != resolvedValue && !StringUtil.isEmptyOrSpaces(resolvedValue)) {
@@ -204,29 +229,44 @@ class DependencyUpdaterInspection : DomElementsInspection<MavenDomProjectModel?>
                     }
                 }
             }
-            val projectName = createLinkText(model, dependency)
-            holder.createProblem(dependency.version, HighlightSeverity.WARNING,
-                    message("inspection.plugin.version.outdated", projectName, groupId, artifactId,
-                            version, latestVersion), fix)
+            val projectName = createLinkText(projectModel, dependency)
+            holder.createProblem(
+                    dependency.version,
+                    HighlightSeverity.WARNING,
+                    message(
+                            "inspection.plugin.version.outdated",
+                            projectName,
+                            groupId,
+                            artifactId,
+                            version,
+                            latestVersion),
+                    fix
+            )
         }
 
         private fun createLinkText(model: MavenDomProjectModel, dependency: MavenDomDependency): String {
             val tag = dependency.xmlTag ?: return MavenDomUtil.getProjectName(model)
             val file = tag.containingFile.virtualFile ?: return MavenDomUtil.getProjectName(model)
-            return String.format("<a href ='#navigation/%s:%s'>%s</a>",
+            return String.format(
+                    "<a href ='#navigation/%s:%s'>%s</a>",
                     file.path,
                     tag.textRange.startOffset,
-                    MavenDomUtil.getProjectName(model))
+                    MavenDomUtil.getProjectName(model)
+            )
         }
 
         private fun resolveXmlElement(xmlElement: XmlElement): String? {
-            val psiReference = ContainerUtil.findInstance(xmlElement.references, MavenPropertyPsiReference::class.java)
-                    ?: return null
+            val psiReference = ContainerUtil.findInstance(
+                    xmlElement.references,
+                    MavenPropertyPsiReference::class.java
+            ) ?: return null
             val resolvedElement = psiReference.resolve() as? MavenPsiElementWrapper ?: return null
             val xmlTag = resolvedElement.wrappee
             return if (xmlTag !is XmlTag) {
                 null
-            } else xmlTag.value.trimmedText
+            } else {
+                xmlTag.value.trimmedText
+            }
         }
     }
 }
