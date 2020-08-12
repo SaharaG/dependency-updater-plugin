@@ -27,7 +27,7 @@ import org.jetbrains.idea.maven.indices.MavenArtifactSearcher
 import org.jetbrains.idea.maven.model.MavenCoordinate
 import org.jetbrains.idea.maven.onlinecompletion.model.MavenDependencyCompletionItem
 import org.jetbrains.idea.maven.server.MavenServerManager
-import java.util.*
+import java.util.Arrays
 import java.util.function.Consumer
 import kotlin.collections.HashSet
 
