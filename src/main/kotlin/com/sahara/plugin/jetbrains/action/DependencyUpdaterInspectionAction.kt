@@ -52,9 +52,8 @@ class DependencyUpdaterInspectionAction : AnAction() {
         allWrappers.add(toolWrapper)
         currentProfile.collectDependentInspections(toolWrapper, allWrappers, managerEx.project)
 
-        var scope: AnalysisScope? = null
         if (psiFile != null) {
-            scope = AnalysisScope(psiFile)
+            val scope = AnalysisScope(psiFile)
 
             // make sure only one tool window at the same time
             val toolWindow = ToolWindowManager.getInstance(managerEx.project).getToolWindow(ToolWindowId.INSPECTION)

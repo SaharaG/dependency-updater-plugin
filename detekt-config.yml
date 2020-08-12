@@ -3,9 +3,7 @@
 
 formatting:
   Indentation:
-    active: false
-  ParameterListWrapping:
-    active: false
+    active: true
 
 complexity:
   LongParameterList:

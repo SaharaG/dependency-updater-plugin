@@ -7,6 +7,7 @@ import com.intellij.codeInspection.util.IntentionFamilyName
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Version
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi.xml.XmlElement
 import com.intellij.psi.xml.XmlTag
@@ -23,10 +24,12 @@ import org.jetbrains.idea.maven.dom.model.MavenDomDependency
 import org.jetbrains.idea.maven.dom.model.MavenDomProjectModel
 import org.jetbrains.idea.maven.dom.references.MavenPropertyPsiReference
 import org.jetbrains.idea.maven.dom.references.MavenPsiElementWrapper
+import org.jetbrains.idea.maven.execution.MavenExternalParameters
 import org.jetbrains.idea.maven.indices.MavenArtifactSearcher
 import org.jetbrains.idea.maven.model.MavenCoordinate
 import org.jetbrains.idea.maven.onlinecompletion.model.MavenDependencyCompletionItem
-import org.jetbrains.idea.maven.server.MavenServerManager
+import org.jetbrains.idea.maven.project.MavenProjectsManager
+import org.jetbrains.idea.maven.utils.MavenUtil
 import java.util.Arrays
 import java.util.function.Consumer
 import kotlin.collections.HashSet
@@ -45,8 +48,8 @@ import kotlin.collections.HashSet
 class DependencyUpdaterInspection : DomElementsInspection<MavenDomProjectModel?>(MavenDomProjectModel::class.java) {
 
     override fun checkFileElement(
-            domFileElement: DomFileElement<MavenDomProjectModel?>?,
-            holder: DomElementAnnotationHolder?
+        domFileElement: DomFileElement<MavenDomProjectModel?>?,
+        holder: DomElementAnnotationHolder?
     ) {
         val projectModel = domFileElement?.rootElement ?: return
         if (null == holder) {
@@ -59,7 +62,8 @@ class DependencyUpdaterInspection : DomElementsInspection<MavenDomProjectModel?>
         for (dependency in projectModel.dependencies.dependencies) {
             val groupId = dependency.groupId.stringValue
             val artifactId = dependency.artifactId.stringValue
-            if (StringUtil.isEmptyOrSpaces(artifactId) || StringUtil.isEmptyOrSpaces(groupId)) {
+            val version = dependency.version.stringValue
+            if (isAnyBlank(artifactId, groupId, version)) {
                 continue
             }
             dependencies.add(dependency)
@@ -69,7 +73,8 @@ class DependencyUpdaterInspection : DomElementsInspection<MavenDomProjectModel?>
         for (dependency in projectModel.dependencyManagement.dependencies.dependencies) {
             val groupId = dependency.groupId.stringValue
             val artifactId = dependency.artifactId.stringValue
-            if (StringUtil.isEmptyOrSpaces(artifactId) || StringUtil.isEmptyOrSpaces(groupId)) {
+            val version = dependency.version.stringValue
+            if (isAnyBlank(artifactId, groupId, version)) {
                 continue
             }
             dependencies.add(dependency)
@@ -108,43 +113,48 @@ class DependencyUpdaterInspection : DomElementsInspection<MavenDomProjectModel?>
         private const val MAX_ARTIFACT_SEARCHER_RESULT = 200
         private val mavenArtifactSearcher = MavenArtifactSearcher()
 
-        private fun checkLatestVersion(domFileElement: DomFileElement<MavenDomProjectModel?>,
-                                       holder: DomElementAnnotationHolder,
-                                       dependencies: MutableSet<MavenDomDependency>) {
+        private fun checkLatestVersion(
+            domFileElement: DomFileElement<MavenDomProjectModel?>,
+            holder: DomElementAnnotationHolder,
+            dependencies: MutableSet<MavenDomDependency>
+        ) {
             val module = domFileElement.module ?: return
-            dependencies.forEach(Consumer { dependency: MavenDomDependency ->
-                val groupId = dependency.groupId.stringValue
-                val artifactId = dependency.artifactId.stringValue
-                val version = dependency.version.stringValue
-                if (null == version || StringUtil.isEmptyOrSpaces(version)) {
-                    return@Consumer
-                }
-
-                // remote https://package-search.services.jetbrains.com/api/search/idea/fulltext?query=${pattern}
-                val pattern = "$groupId:$artifactId:"
-                val results = mavenArtifactSearcher.search(module.project, pattern, MAX_ARTIFACT_SEARCHER_RESULT)
-                for (result in results) {
-                    val info = result.searchResults
-                    if (groupId != info.groupId || artifactId != info.artifactId) {
-                        continue
-                    }
-                    val versions: Array<MavenDependencyCompletionItem> = info.items
-                    Arrays.sort(versions) { i1: MavenCoordinate, i2: MavenCoordinate ->
-                        val v1 = i1.version
-                        val v2 = i2.version
-                        assert(v1 != null)
-                        ComparableVersion(v2).compareTo(ComparableVersion(v1))
+            dependencies.forEach(
+                Consumer { dependency: MavenDomDependency ->
+                    val groupId = dependency.groupId.stringValue
+                    val artifactId = dependency.artifactId.stringValue
+                    val version = dependency.version.stringValue
+                    if (null == groupId || null == artifactId || null == version) {
+                        return@Consumer
                     }
 
-                    // latest version item
-                    val latestVersion = versions[0].version
-                    if (null != latestVersion && !StringUtil.isEmptyOrSpaces(latestVersion) && ComparableVersion
-                            (latestVersion) > ComparableVersion(version)) {
-                        logger.info("[$groupId:$artifactId] found latest version : $latestVersion")
-                        createProblem(dependency, domFileElement, holder, groupId, artifactId, version, latestVersion)
+                    // remote https://package-search.services.jetbrains.com/api/search/idea/fulltext?query=${pattern}
+                    val pattern = "$groupId:$artifactId:"
+                    val results = mavenArtifactSearcher.search(module.project, pattern, MAX_ARTIFACT_SEARCHER_RESULT)
+                    results.filter {
+                        it.searchResults.groupId == groupId && it.searchResults.artifactId == artifactId
+                    }.forEach {
+                        val info = it.searchResults
+                        val versions: Array<MavenDependencyCompletionItem> = info.items
+                        Arrays.sort(versions) { i1: MavenCoordinate, i2: MavenCoordinate ->
+                            val v1 = i1.version
+                            val v2 = i2.version
+                            assert(v1 != null)
+                            ComparableVersion(v2).compareTo(ComparableVersion(v1))
+                        }
+
+                        // latest version item
+                        val latest = versions[0].version
+                        if (null == latest || StringUtil.isEmptyOrSpaces(latest)) {
+                            return@forEach
+                        }
+                        if (ComparableVersion(latest) > ComparableVersion(version)) {
+                            logger.info("[$groupId:$artifactId] found latest version : $latest")
+                            createProblem(dependency, domFileElement, holder, groupId, artifactId, version, latest)
+                        }
                     }
                 }
-            })
+            )
         }
 
         /**
@@ -158,23 +168,22 @@ class DependencyUpdaterInspection : DomElementsInspection<MavenDomProjectModel?>
          * @param version       current version
          * @param latestVersion latest version
          */
-        private fun createProblem(dependency: MavenDomDependency,
-                                  domFileElement: DomFileElement<MavenDomProjectModel?>,
-                                  holder: DomElementAnnotationHolder,
-                                  groupId: String,
-                                  artifactId: String,
-                                  version: String,
-                                  latestVersion: String) {
+        private fun createProblem(
+            dependency: MavenDomDependency,
+            domFileElement: DomFileElement<MavenDomProjectModel?>,
+            holder: DomElementAnnotationHolder,
+            groupId: String,
+            artifactId: String,
+            version: String,
+            latestVersion: String
+        ) {
             val projectModel = domFileElement.rootElement
             val domValue = dependency.version
 
             // ${xx.version}
             val unresolvedValue = domValue.rawText ?: return
-            val maven35 = StringUtil.compareVersionNumbers(
-                    MavenServerManager.getInstance().currentMavenVersion,
-                    MAVEN_VERSION_35
-            ) >= 0
-            val valueToCheck = if (maven35) {
+
+            val valueToCheck = if (maven35(domFileElement.manager.project)) {
                 unresolvedValue.replace(VALUE_TO_CHECK.toRegex(), "")
             } else {
                 unresolvedValue
@@ -194,8 +203,10 @@ class DependencyUpdaterInspection : DomElementsInspection<MavenDomProjectModel?>
                 }
 
                 // find reference property
-                val psiReference = ContainerUtil.findInstance(domValue.xmlElement!!.references,
-                        MavenPropertyPsiReference::class.java) ?: return
+                val psiReference = ContainerUtil.findInstance(
+                    domValue.xmlElement!!.references,
+                    MavenPropertyPsiReference::class.java
+                ) ?: return
                 val resolvedElement = psiReference.resolve() ?: return
                 val psiElement = (resolvedElement as MavenPsiElementWrapper).wrappee
                 if (unresolvedValue != resolvedValue && !StringUtil.isEmptyOrSpaces(resolvedValue)) {
@@ -231,16 +242,17 @@ class DependencyUpdaterInspection : DomElementsInspection<MavenDomProjectModel?>
             }
             val projectName = createLinkText(projectModel, dependency)
             holder.createProblem(
-                    dependency.version,
-                    HighlightSeverity.WARNING,
-                    message(
-                            "inspection.plugin.version.outdated",
-                            projectName,
-                            groupId,
-                            artifactId,
-                            version,
-                            latestVersion),
-                    fix
+                dependency.version,
+                HighlightSeverity.WARNING,
+                message(
+                    "inspection.plugin.version.outdated",
+                    projectName,
+                    groupId,
+                    artifactId,
+                    version,
+                    latestVersion
+                ),
+                fix
             )
         }
 
@@ -248,17 +260,17 @@ class DependencyUpdaterInspection : DomElementsInspection<MavenDomProjectModel?>
             val tag = dependency.xmlTag ?: return MavenDomUtil.getProjectName(model)
             val file = tag.containingFile.virtualFile ?: return MavenDomUtil.getProjectName(model)
             return String.format(
-                    "<a href ='#navigation/%s:%s'>%s</a>",
-                    file.path,
-                    tag.textRange.startOffset,
-                    MavenDomUtil.getProjectName(model)
+                "<a href ='#navigation/%s:%s'>%s</a>",
+                file.path,
+                tag.textRange.startOffset,
+                MavenDomUtil.getProjectName(model)
             )
         }
 
         private fun resolveXmlElement(xmlElement: XmlElement): String? {
             val psiReference = ContainerUtil.findInstance(
-                    xmlElement.references,
-                    MavenPropertyPsiReference::class.java
+                xmlElement.references,
+                MavenPropertyPsiReference::class.java
             ) ?: return null
             val resolvedElement = psiReference.resolve() as? MavenPsiElementWrapper ?: return null
             val xmlTag = resolvedElement.wrappee
@@ -266,6 +278,36 @@ class DependencyUpdaterInspection : DomElementsInspection<MavenDomProjectModel?>
                 null
             } else {
                 xmlTag.value.trimmedText
+            }
+        }
+
+        private fun maven35(project: Project): Boolean {
+            val manager = MavenProjectsManager.getInstance(project)
+            val generalSettings = manager.generalSettings
+            var maven35 = true
+            try {
+                var mavenVersion = MavenUtil.getMavenVersion(
+                    MavenExternalParameters.resolveMavenHome(generalSettings, project, null)
+                )
+                mavenVersion = mavenVersion?.let { Version.parseVersion(it)?.toCompactString() } ?: "unknown"
+                maven35 = StringUtil.compareVersionNumbers(mavenVersion, MAVEN_VERSION_35) >= 0
+            } catch (ignore: Exception) {
+                // ignore invalid maven home configuration
+                logger.error("invalid maven home configuration")
+            }
+            return maven35
+        }
+
+        private fun isAnyBlank(vararg css: String?): Boolean {
+            return if (css.isEmpty()) {
+                false
+            } else {
+                css.forEach {
+                    if (StringUtil.isEmptyOrSpaces(it)) {
+                        return true
+                    }
+                }
+                false
             }
         }
     }
